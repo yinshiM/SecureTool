@@ -30,7 +30,7 @@
 
 - Python 3.6+
 - GUI依赖库：Pyqt5
-- 打包命令：`python -m PyInstaller -F -w -n TamperTool tamper_signature_allpy.py -i tamper.ico --onefile`
+- 打包命令：`python -m PyInstaller -F -w -n TamperTool tamperTools.py -i tamper.ico --onefile`
 
 ## 注意事项
 

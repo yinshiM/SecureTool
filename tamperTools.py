@@ -145,11 +145,11 @@ hbox1.addWidget(file_input)
 hbox1.addWidget(btn_browse)
 
 hbox2 = QHBoxLayout()
-hbox2.addWidget(QLabel("篡改模式:"));
+hbox2.addWidget(QLabel("篡改模式:"))
 hbox2.addWidget(mode_cb)
-hbox2.addWidget(QLabel("篡改区域:"));
+hbox2.addWidget(QLabel("篡改区域:"))
 hbox2.addWidget(area_cb)
-hbox2.addWidget(QLabel("次数:"));
+hbox2.addWidget(QLabel("次数:"))
 hbox2.addWidget(times_input)
 hbox2.addWidget(btn_start)
 hbox2.addWidget(btn_clear)
@@ -199,13 +199,13 @@ def compare_files():
 tab2 = QWidget()
 layout2 = QVBoxLayout(tab2)
 
-btn_orig = QPushButton("选择原始文件");
+btn_orig = QPushButton("选择原始文件")
 btn_orig.clicked.connect(select_original_file)
-btn_tamp = QPushButton("选择篡改文件");
+btn_tamp = QPushButton("选择篡改文件")
 btn_tamp.clicked.connect(select_tampered_file)
-btn_cmp = QPushButton("对比文件差异");
+btn_cmp = QPushButton("对比文件差异")
 btn_cmp.clicked.connect(compare_files)
-btn_clr = QPushButton("清除日志");
+btn_clr = QPushButton("清除日志")
 btn_clr.clicked.connect(compare_log.clear)
 
 hbox_cmp = QHBoxLayout()
