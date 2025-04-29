@@ -3,6 +3,8 @@ import os
 import random
 import re
 import datetime
+import subprocess
+import zipfile
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
@@ -10,6 +12,21 @@ from PyQt5.QtWidgets import (
     QPushButton, QLineEdit, QLabel, QComboBox,
     QFileDialog, QTextEdit, QTabWidget
 )
+
+app = QApplication(sys.argv)
+app.setStyle('Fusion')
+app.setFont(QFont('微软雅黑', 10))
+
+window = QWidget()
+window.setWindowTitle('固件篡改工具 v4.0.3')
+window.setWindowIcon(QIcon("tamper.ico"))
+window.resize(900, 600)
+
+tabs = QTabWidget()
+
+# 固件篡改日志输出框
+firm_log = QTextEdit()
+firm_log.setReadOnly(True)
 
 SIGNATURE_PATTERNS = [
     (b'\x30\x82', 'X.509证书头'),
@@ -26,21 +43,6 @@ SIGNATURE_PATTERNS = [
 
 compare_file1 = None
 compare_file2 = None
-
-app = QApplication(sys.argv)
-app.setStyle('Fusion')
-app.setFont(QFont('微软雅黑', 10))
-
-window = QWidget()
-window.setWindowTitle('固件篡改工具 v4.0.3')
-window.setWindowIcon(QIcon("tamper.ico"))
-window.resize(900, 600)
-
-tabs = QTabWidget()
-
-# 输出函数绑定范围中
-firm_log = QTextEdit();
-firm_log.setReadOnly(True)
 
 
 def log(msg):
@@ -126,16 +128,14 @@ btn_browse = QPushButton("📂 选择文件")
 btn_browse.clicked.connect(lambda: file_input.setText(
     QFileDialog.getOpenFileName(window, '选择固件', '', '固件 (*.bin *.zip *.dtb *.imx)')[0]))
 
-mode_cb = QComboBox();
+mode_cb = QComboBox()
 mode_cb.addItems(['flip', 'zero', 'random'])
-area_cb = QComboBox();
+area_cb = QComboBox()
 area_cb.addItems(['签名区域', '非签名区域', '两者都篡改'])
 times_input = QLineEdit('1')
-
 btn_start = QPushButton("🚀 开始篡改")
 btn_start.clicked.connect(
     lambda: tamper_firmware(file_input.text(), mode_cb.currentText(), int(times_input.text()), area_cb.currentText()))
-
 btn_clear = QPushButton("清除日志")
 btn_clear.clicked.connect(firm_log.clear)
 
@@ -220,14 +220,122 @@ layout2.addWidget(compare_log)
 
 tabs.addTab(tab2, "文件对比")
 
-# Tab 3 - 使用说明
+# Tab 3 - 签名解析
+parse_tab = QWidget()
+parse_layout = QVBoxLayout(parse_tab)
+parse_log = QTextEdit()
+parse_log.setReadOnly(True)
+parse_input = QLineEdit()
+parse_input.setPlaceholderText("拖入或选择要解析的文件路径")
+
+parse_btn = QPushButton("选择文件")
+parse_btn.clicked.connect(lambda: parse_input.setText(QFileDialog.getOpenFileName(None, '选择固件文件')[0]))
+
+parse_start_btn = QPushButton("解析+提取证书")
+parse_start_btn.clicked.connect(
+    lambda: handle_parse_file(parse_input.text()) if parse_input.text() else parse_log.append("[!] 请输入文件路径"))
+
+parse_clear_btn = QPushButton("清除日志")
+parse_clear_btn.clicked.connect(parse_log.clear)
+
+parse_top = QHBoxLayout()
+parse_top.addWidget(QLabel("文件路径:"))
+parse_top.addWidget(parse_input)
+parse_top.addWidget(parse_btn)
+parse_top.addWidget(parse_start_btn)
+parse_top.addWidget(parse_clear_btn)  # ✅ 加到同一行
+
+parse_layout.addLayout(parse_top)
+parse_layout.addWidget(QLabel("解析结果:"))
+parse_layout.addWidget(parse_log)
+
+
+def handle_parse_file(path):
+    if not os.path.isfile(path):
+        parse_log.append("[!] 文件无效")
+        return
+    parse_log.append("[*] 使用 openssl 检查签名/证书信息...");
+    parse_log.append("=" * 50)
+    try:
+        for cmd, label in [
+            (f"openssl pkcs7 -inform DER -in \"{path}\" -print_certs", "PKCS7"),
+            (f"openssl x509 -inform DER -in \"{path}\" -noout -text", "X.509 DER"),
+            (f"openssl x509 -in \"{path}\" -noout -text", "PEM")
+        ]:
+            result = subprocess.getoutput(cmd)
+            if "Certificate:" in result or "BEGIN CERTIFICATE" in result:
+                parse_log.append(f"[+] 检测到 {label} 格式证书:")
+                for line in result.strip().splitlines():
+                    parse_log.append("    " + line)
+                if label == "X.509 DER":
+                    pem_out = os.path.splitext(os.path.basename(path))[0] + "_converted.pem"
+                    subprocess.getoutput(f"openssl x509 -inform DER -in \"{path}\" -out \"{pem_out}\"")
+                    parse_log.append(f"    [+] 已转换并保存为: {pem_out}")
+            else:
+                parse_log.append(f"[-] 未检测到 {label} 格式证书")
+    except Exception as e:
+        parse_log.append(f"[!] openssl 执行失败: {e}")
+    parse_log.append("=" * 50)
+    certs = []
+    try:
+        from apkverify import ApkSignature
+        if zipfile.is_zipfile(path):
+            parse_log.append("[*] Apk 文件解析开始")
+            checker = ApkSignature(os.path.abspath(path))
+            checker.verify(2)
+            parse_log.append("[*] 调用 checker.all_certs()")
+            certs = checker.all_certs()
+            if not certs:
+                parse_log.append("[-] 未提取到任何证书")
+                return
+        else:
+            raise ValueError("不是 ZIP 格式，尝试 bin 提取")
+    except Exception:
+        try:
+            parse_log.append("[*] 尝试在二进制文件中提取证书片段")
+            with open(path, 'rb') as f:
+                data = f.read()
+            for m in re.finditer(b'-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----', data, re.DOTALL):
+                cert_block = m.group(0)
+                certs.append(cert_block if isinstance(cert_block, bytes) else cert_block.encode())
+            if not certs:
+                parse_log.append("[-] 未在 bin 文件中找到 PEM 格式证书")
+                return
+        except Exception as e:
+            parse_log.append(f"[!] bin 解析失败: {e}")
+            return
+    if not certs:
+        parse_log.append("[-] 未提取到任何证书")
+        return
+    out_dir = os.path.splitext(os.path.basename(path))[0] + "_certs"
+    os.makedirs(out_dir, exist_ok=True)
+    for idx, cert in enumerate(certs):
+        out_path = os.path.join(out_dir, f"cert_{idx + 1}.pem")
+        if isinstance(cert, str):
+            cert = cert.encode('utf-8')
+        with open(out_path, 'wb') as f:
+            f.write(cert)
+        parse_log.append(f"[+] 提取证书已保存: {out_path}")
+        try:
+            info = subprocess.getoutput(f"openssl x509 -in \"{out_path}\" -noout -subject -issuer -dates -serial")
+            parse_log.append("    证书信息:")
+            for line in info.strip().splitlines():
+                parse_log.append("        " + line)
+        except Exception as e:
+            parse_log.append(f"    [-] openssl 分析失败: {e}")
+    parse_log.append(f"[*] 共提取 {len(certs)} 个证书")
+
+
+tabs.addTab(parse_tab, "签名解析")
+
+# Tab 4 - 使用说明
 usage_tab = QWidget()
 usage_layout = QVBoxLayout(usage_tab)
 usage_text = QTextEdit()
 usage_text.setReadOnly(True)
 usage_text.setPlainText("""工具简介:
-- 本工具用于模拟固件签名区域被破坏的情景,可用于测试安全启动(Secure Boot)机制的有效性\安全升级(OTA)机制有效性.
-- 支持处理多种格式的固件文件，包括.bin、.dtb、.imx和.zip(包含上述格式文件).
+- 本工具用于模拟固件签名区域被破坏的情景,可用于测试安全启动(Secure Boot)机制的有效性、安全升级(OTA)机制有效性。
+- 支持处理多种格式的固件文件，包括.bin、.dtb、.imx和.zip(包含上述格式文件)。
 
 支持文件类型:
 - 固件包 (.zip), 二进制文件 (.bin), 设备树 (.dtb), IMX 镜像 (.imx)
@@ -240,12 +348,7 @@ usage_text.setPlainText("""工具简介:
 篡改区域:
 - 签名区域、非签名区域、两者都篡改
 
-操作原理:
-- 识别签名偏移
-- 篡改后查看日志输出
-- 文件对比页面可查看不同字节
-
-使用说明:
+操作说明:
 1. 点击"选择固件文件"，导入需要篡改的固件
 2. 选择篡改模式，设置篡改次数
 3. 点击"开始篡改"按钮
@@ -254,7 +357,6 @@ usage_text.setPlainText("""工具简介:
 usage_layout.addWidget(usage_text)
 tabs.addTab(usage_tab, "📖 使用说明")
 
-# 恢复窗口布局
 window.setLayout(QVBoxLayout())
 window.layout().addWidget(tabs)
 window.show()
