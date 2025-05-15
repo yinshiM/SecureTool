@@ -1,3 +1,4 @@
+import csv
 import sys
 import os
 import random
@@ -5,7 +6,7 @@ import re
 import datetime
 import subprocess
 import zipfile
-from PyQt5.QtCore import Qt
+import requests
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
@@ -18,7 +19,7 @@ app.setStyle('Fusion')
 app.setFont(QFont('微软雅黑', 10))
 
 window = QWidget()
-window.setWindowTitle('固件篡改工具 v4.0.3')
+window.setWindowTitle('安全工具 v4.1')
 window.setWindowIcon(QIcon("tamper.ico"))
 window.resize(900, 600)
 
@@ -328,7 +329,135 @@ def handle_parse_file(path):
 
 tabs.addTab(parse_tab, "签名解析")
 
-# Tab 4 - 使用说明
+# Tab 4 - 组件漏洞提取
+
+vuln_tab = QWidget()
+vuln_layout = QVBoxLayout(vuln_tab)
+vuln_log = QTextEdit()
+vuln_log.setReadOnly(True)
+
+# 输入框初始化
+url_input = QLineEdit("http://172.16.3.78:8080")
+api_key_input = QLineEdit("odt_DJItqXDqQlxk4X9bVSFJXak2lGIDNofu")
+api_key_input.setEchoMode(QLineEdit.Password)
+uuid_input = QLineEdit()
+uuid_input.setPlaceholderText("项目 UUID")
+
+# 设置统一输入框宽度（可选）
+url_input.setMinimumWidth(500)
+api_key_input.setMinimumWidth(500)
+uuid_input.setMinimumWidth(500)
+
+# Label 宽度统一
+label_width = 130
+
+lbl_url = QLabel("🎯 DT-Api:")
+lbl_url.setFixedWidth(label_width)
+
+lbl_key = QLabel("🔑 API-Key:")
+lbl_key.setFixedWidth(label_width)
+
+lbl_uuid = QLabel("🆔 UUID:")
+lbl_uuid.setFixedWidth(label_width)
+
+# 分行布局
+url_row = QHBoxLayout()
+url_row.addWidget(lbl_url)
+url_row.addWidget(url_input)
+
+key_row = QHBoxLayout()
+key_row.addWidget(lbl_key)
+key_row.addWidget(api_key_input)
+
+uuid_row = QHBoxLayout()
+uuid_row.addWidget(lbl_uuid)
+uuid_row.addWidget(uuid_input)
+
+
+def fetch_vulns():
+    base_url = url_input.text().strip()
+    api_key = api_key_input.text().strip()
+    project_uuid = uuid_input.text().strip()
+    if not all([base_url, api_key, project_uuid]):
+        vuln_log.append("[!] 请填写完整地址、API Key 和 UUID")
+        return
+    endpoint = f"{base_url}/api/v1/finding/project/{project_uuid}/export"
+    headers = {"X-Api-Key": api_key}
+    try:
+        vuln_log.append(f"[*] 请求: {endpoint}")
+        resp = requests.get(endpoint, headers=headers, timeout=10)
+        resp.raise_for_status()
+        findings = resp.json().get("findings", [])
+        if not findings:
+            vuln_log.append("[-] 未发现任何漏洞")
+            return
+        global latest_findings
+        latest_findings = findings
+        vuln_log.append(f"[+] 共获取 {len(findings)} 条漏洞记录")
+        comp_stats = {}
+        for finding in findings:
+            comp = finding.get("component", {}).get("name", "未知组件")
+            comp_stats[comp] = comp_stats.get(comp, 0) + 1
+        for comp, count in comp_stats.items():
+            vuln_log.append(f"    组件: {comp} -> 漏洞数量: {count}")
+    except Exception as e:
+        vuln_log.append(f"[!] 拉取失败: {e}")
+
+
+def export_to_csv():
+    if not latest_findings:
+        vuln_log.append("[!] 暂无漏洞信息可导出")
+        return
+
+    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    folder = QFileDialog.getExistingDirectory(None, "选择导出目录")
+    if not folder:
+        vuln_log.append("[!] 已取消导出")
+        return
+
+    out_path = os.path.join(folder, f"vulnerabilities_{ts}.csv")
+
+    try:
+        with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
+            writer = csv.writer(f)
+            writer.writerow(["组件", "版本", "CVE ID", "CVSS", "描述"])
+            for item in latest_findings:
+                comp = item.get("component", {}).get("name", "")
+                vers = item.get("component", {}).get("version", "")
+                vuln = item.get("vulnerability", {})
+                cve = vuln.get("vulnId", "")
+                score = vuln.get("cvssV3", {}).get("baseScore", vuln.get("cvssV2", {}).get("score", ""))
+                desc = vuln.get("description", "")[:100].replace('\n', ' ')
+                writer.writerow([comp, vers, cve, score, desc])
+        vuln_log.append(f"[+] 已保存到: {out_path}")
+    except Exception as e:
+        vuln_log.append(f"[!] 导出失败: {e}")
+
+
+# 按钮布局
+btn_row = QHBoxLayout()
+fetch_btn = QPushButton("拉取漏洞信息")
+export_btn = QPushButton("导出为 Excel")
+clear_btn = QPushButton("清除日志")
+btn_row.addWidget(fetch_btn)
+btn_row.addWidget(export_btn)
+btn_row.addWidget(clear_btn)
+
+fetch_btn.clicked.connect(fetch_vulns)
+export_btn.clicked.connect(export_to_csv)
+clear_btn.clicked.connect(vuln_log.clear)
+
+# 添加到主布局
+vuln_layout.addLayout(url_row)
+vuln_layout.addLayout(key_row)
+vuln_layout.addLayout(uuid_row)
+vuln_layout.addLayout(btn_row)
+vuln_layout.addWidget(QLabel("📋 漏洞日志输出:"))
+vuln_layout.addWidget(vuln_log)
+
+tabs.addTab(vuln_tab, "组件漏洞提取")
+
+# Tab 5 - 使用说明
 usage_tab = QWidget()
 usage_layout = QVBoxLayout(usage_tab)
 usage_text = QTextEdit()
@@ -336,6 +465,7 @@ usage_text.setReadOnly(True)
 usage_text.setPlainText("""工具简介:
 - 本工具用于模拟固件签名区域被破坏的情景,可用于测试安全启动(Secure Boot)机制的有效性、安全升级(OTA)机制有效性。
 - 支持处理多种格式的固件文件，包括.bin、.dtb、.imx和.zip(包含上述格式文件)。
+- 支持Dependency-Track平台漏洞信息获取。
 
 支持文件类型:
 - 固件包 (.zip), 二进制文件 (.bin), 设备树 (.dtb), IMX 镜像 (.imx)
@@ -353,6 +483,10 @@ usage_text.setPlainText("""工具简介:
 2. 选择篡改模式，设置篡改次数
 3. 点击"开始篡改"按钮
 4. 程序会自动识别签名区域(或默认使用文件尾部区域)，并进行篡改
+
+漏洞信息获取操作说明:
+1.填写相应任务UUID，点击漏洞信息获取可获得漏洞统计。
+2.点击保存为Excel表格可导出漏洞信息到表格。
 """)
 usage_layout.addWidget(usage_text)
 tabs.addTab(usage_tab, "📖 使用说明")
