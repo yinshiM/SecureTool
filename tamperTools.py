@@ -337,8 +337,8 @@ vuln_log = QTextEdit()
 vuln_log.setReadOnly(True)
 
 # 输入框初始化
-url_input = QLineEdit("http://172.16.3.78:8080")
-api_key_input = QLineEdit("odt_DJItqXDqQlxk4X9bVSFJXak2lGIDNofu")
+url_input = QLineEdit("URL")
+api_key_input = QLineEdit("Keyyyy")
 api_key_input.setEchoMode(QLineEdit.Password)
 uuid_input = QLineEdit()
 uuid_input.setPlaceholderText("项目 UUID")
