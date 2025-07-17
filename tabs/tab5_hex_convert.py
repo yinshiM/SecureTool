@@ -1,134 +1,145 @@
-import os, re, json
+import os
+import re
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFileDialog
+    QTextEdit, QLineEdit, QFileDialog, QComboBox, QMessageBox
 )
+
+# 常用编码列表（用于自动尝试或手动选择）
+COMMON_ENCODINGS = [
+    "utf-8", "gbk", "gb2312", "latin1", "utf-16", "utf-32", "ascii", "big5"
+]
+
+
+def extract_clean_bytes(hex_text: str) -> bytes:
+    import re
+    segments = re.findall(r'(?:[0-9a-fA-F]{2}[ \t]*){4,}', hex_text)
+    hex_bytes = []
+    for seg in segments:
+        hex_bytes += re.findall(r'[0-9a-fA-F]{2}', seg)
+    raw = bytes(int(b, 16) for b in hex_bytes)
+
+    try:
+        decoded = raw.decode("utf-8", errors="ignore")
+    except UnicodeDecodeError:
+        decoded = raw.decode("latin1", errors="ignore")
+
+    # 过滤：只保留 ASCII 可见字符 + 换行（0x0A）和回车（0x0D）
+    filtered = ''.join(c for c in decoded if (32 <= ord(c) <= 126 or c in '\r\n'))
+
+    return filtered.encode("utf-8")
+
+
+def score_text_readability(text: str) -> int:
+    """简单评分：统计可见字符比例"""
+    return sum(c.isprintable() for c in text)
 
 
 def create_hex_tab():
     tab = QWidget()
     layout = QVBoxLayout(tab)
-    log_output = QTextEdit()
-    log_output.setReadOnly(True)
-    result_output = QTextEdit()
-    result_output.setReadOnly(True)
-    hex_file_input = QLineEdit()
-    hex_file_input.setPlaceholderText("请选择包含 hex 字节的文本文件")
 
-    hex_bytes = []
-    format_guess = "txt"  # 默认猜测为文本
+    # 输入控件
+    hex_input = QTextEdit()
+    hex_input.setPlaceholderText("可粘贴包含 HEX 字符的文本，支持空格或无空格格式")
+    hex_log = QTextEdit();
+    hex_log.setReadOnly(True)
+    hex_result = QTextEdit();
+    hex_result.setReadOnly(True)
+    encoding_box = QComboBox();
+    encoding_box.addItems(COMMON_ENCODINGS);
+    encoding_box.setCurrentText("utf-8")
 
-    def log(msg):
-        log_output.append(msg)
-
-    def guess_format(decoded_text: str, raw_bytes: bytes) -> str:
-        try:
-            json.loads(decoded_text)
-            return "json"
-        except:
-            pass
-        if raw_bytes.startswith(b'\x7fELF'):
-            return "bin"
-        if raw_bytes.startswith(b'PK\x03\x04') or raw_bytes.startswith(b'\x50\x4B\x03\x04'):
-            return "zip"
-        if raw_bytes.startswith(b'\x89PNG'):
-            return "png"
-        printable_ratio = sum(32 <= b < 127 for b in raw_bytes) / max(1, len(raw_bytes))
-        if printable_ratio > 0.95:
-            return "txt"
-        return "bin"
-
-    def parse_hex_file():
-        nonlocal hex_bytes, format_guess
-        path = hex_file_input.text().strip()
-        if not os.path.isfile(path):
-            log("[!] 文件无效")
+    def parse_input():
+        content = hex_input.toPlainText()
+        if not content.strip():
+            hex_log.append("[!] 请输入HEX字符串或打开文件")
             return
-        log(f"[*] 处理文件: {path}")
+        raw_bytes = extract_clean_bytes(content)
+        best_text, best_encoding, best_score = "", "", -1
+        all_results = []
+
+        for enc in COMMON_ENCODINGS:
+            try:
+                decoded = raw_bytes.decode(enc, errors="ignore")
+                score = score_text_readability(decoded)
+                all_results.append((enc, score, decoded))
+                if score > best_score:
+                    best_score = score
+                    best_encoding = enc
+                    best_text = decoded
+            except:
+                continue
+
+        # 更新输出
+        encoding_box.setCurrentText(best_encoding)
+        hex_result.setPlainText(best_text)
+        hex_log.append(f"[+] 自动选择最优编码: {best_encoding}, 可读性评分: {best_score}")
+        hex_log.append("[=] 所有编码尝试结果:")
+        for enc, score, _ in all_results:
+            hex_log.append(f"    {enc:<10} → Score: {score}")
+
+    def parse_file():
+        path, _ = QFileDialog.getOpenFileName(None, "选择HEX文本文件", "", "Text Files (*.txt *.log *.hex)")
+        if not path: return
         try:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                lines = f.readlines()
-            hex_bytes = []
-            for line in lines:
-                segments = re.findall(r'(?:\b[0-9a-fA-F]{2}\b(?:\s+|$)){4,}', line)
-                for seg in segments:
-                    hex_bytes.extend(re.findall(r'[0-9a-fA-F]{2}', seg))
-            raw_bytes = bytes(int(b, 16) for b in hex_bytes)
-            clean_bytes = bytes(b for b in raw_bytes if b >= 0x20 or b in (0x0A, 0x0D))
-            try:
-                text = clean_bytes.decode("utf-8", errors="ignore")
-            except:
-                text = clean_bytes.decode("latin1")
-            result_output.setPlainText(text)
-            format_guess = guess_format(text, raw_bytes)
-            log(f"[+] 提取 {len(hex_bytes)} 字节，猜测格式为: {format_guess}")
+                content = f.read()
+                hex_input.setPlainText(content)
+                hex_log.append(f"[+] 文件导入成功: {os.path.basename(path)}")
         except Exception as e:
-            log(f"[!] 解析失败: {e}")
+            hex_log.append(f"[!] 读取失败: {e}")
+
+    def manual_decode():
+        content = hex_input.toPlainText()
+        if not content.strip():
+            hex_log.append("[!] 请输入HEX字符串")
+            return
+        raw_bytes = extract_clean_bytes(content)
+        enc = encoding_box.currentText()
+        try:
+            decoded = raw_bytes.decode(enc, errors="replace")
+            hex_result.setPlainText(decoded)
+            hex_log.append(f"[+] 使用手动编码 {enc} 解码成功")
+        except Exception as e:
+            hex_log.append(f"[!] 解码失败: {e}")
+            hex_result.clear()
 
     def save_result():
-        if not hex_bytes:
-            log("[!] 当前无内容可保存")
+        text = hex_result.toPlainText()
+        if not text.strip():
+            QMessageBox.warning(None, "提示", "没有内容可保存")
             return
-        orig_path = hex_file_input.text().strip()
-        ext = format_guess
-        save_filter = "All files (*.*)"
-        default_name = f"output.{ext}"
-        if ext == "json":
-            save_filter = "JSON files (*.json)"
-        elif ext == "bin":
-            save_filter = "Binary files (*.bin)"
-        elif ext == "txt":
-            save_filter = "Text files (*.txt)"
-        elif ext == "zip":
-            save_filter = "ZIP files (*.zip)"
-        elif ext == "png":
-            save_filter = "PNG images (*.png)"
-
-        out_path, _ = QFileDialog.getSaveFileName(tab, "保存还原文件", default_name, save_filter)
-        if not out_path:
-            log("[!] 用户取消保存")
-            return
-
-        try:
-            if ext in ["bin", "zip", "png"]:
-                raw = bytes(int(b, 16) for b in hex_bytes)
-                with open(out_path, 'wb') as f:
-                    f.write(raw)
-            else:
-                text = result_output.toPlainText()
-                with open(out_path, 'w', encoding='utf-8') as f:
+        path, _ = QFileDialog.getSaveFileName(None, "保存还原结果", "hex_output.txt", "Text Files (*.txt)")
+        if path:
+            try:
+                with open(path, "w", encoding="utf-8") as f:
                     f.write(text)
-            log(f"[+] 成功保存为: {out_path}")
-        except Exception as e:
-            log(f"[!] 保存失败: {e}")
+                hex_log.append(f"[+] 结果已保存到: {path}")
+            except Exception as e:
+                hex_log.append(f"[!] 保存失败: {e}")
 
-    btn_browse = QPushButton("选择HEX文件")
-    btn_browse.clicked.connect(
-        lambda: hex_file_input.setText(
-            QFileDialog.getOpenFileName(tab, '选择 HEX 文件', '', 'Text files (*.txt *.log *.hex *.json *.bin)')[0])
-    )
+    def clear_all():
+        hex_input.clear()
+        hex_log.clear()
+        hex_result.clear()
 
-    btn_parse = QPushButton("解析并还原文本")
-    btn_parse.clicked.connect(parse_hex_file)
+    # 布局构建
+    h1 = QHBoxLayout()
+    h1.addWidget(QPushButton("📂 选择HEX文件", clicked=parse_file))
+    h1.addWidget(QPushButton("🧠 最优解码", clicked=parse_input))
+    h1.addWidget(QLabel("选择编码:"))
+    h1.addWidget(encoding_box)
+    h1.addWidget(QPushButton("解析HEX", clicked=manual_decode))
+    h1.addWidget(QPushButton("保存结果", clicked=save_result))
+    h1.addWidget(QPushButton("清空输出", clicked=clear_all))
 
-    btn_clear = QPushButton("清除日志")
-    btn_clear.clicked.connect(lambda: (log_output.clear(), result_output.clear()))
-
-    btn_save = QPushButton("保存还原结果")
-    btn_save.clicked.connect(save_result)
-
-    top_row = QHBoxLayout()
-    top_row.addWidget(QLabel("文件路径:"))
-    top_row.addWidget(hex_file_input)
-    top_row.addWidget(btn_browse)
-    top_row.addWidget(btn_parse)
-    top_row.addWidget(btn_clear)
-    top_row.addWidget(btn_save)
-
-    layout.addLayout(top_row)
+    layout.addLayout(h1)
+    layout.addWidget(QLabel("HEX粘贴区:"))
+    layout.addWidget(hex_input, 2)
     layout.addWidget(QLabel("日志输出:"))
-    layout.addWidget(log_output)
+    layout.addWidget(hex_log, 1)
     layout.addWidget(QLabel("还原文本:"))
-    layout.addWidget(result_output)
+    layout.addWidget(hex_result, 2)
 
     return tab

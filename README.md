@@ -1,50 +1,58 @@
-# Tamper-Tools 固件篡改与安全评估工具
+# TamperTools 固件篡改与安全分析工具
 
-## 🧩 项目简介
+## 项目简介
 
-Tamper-Tools 是一个用于安全测试的多功能图形界面工具，主要用于模拟固件签名破坏、对比差异、分析证书信息、提取 SBOM 漏洞信息，以及从
-HEX dump 中恢复原始文件。
+TamperTools 是一款用于安全启动机制测试与固件分析的多功能工具。提供图形界面，可快速进行二进制篡改、证书提取、HEX与DID解码、SBOM
+漏洞分析等功能。
 
-本工具适用于测试 Secure Boot、OTA 升级机制、Dependency-Track SBOM 合规性、安全证书分析等场景。
+## 功能总览
 
----
+### ✅ 固件篡改
 
-## 🚀 功能特点
+- 支持 flip、zero、random 多种方式
+- 签名区域自动识别
+- 可处理 bin、imx、dtb、zip 格式
 
-- ✅ **固件签名区域识别与篡改**
-    - 自动检测签名区域（模拟 binwalk）
-    - 支持 flip / zero / random 篡改模式
-    - 支持 zip 包递归处理固件文件
+### ✅ 文件对比
 
-- ✅ **文件差异对比**
-    - 原始与篡改文件 byte 级差异分析
-    - 显示最多 20 条差异项
+- 显示前20处二进制差异
 
-- ✅ **签名解析**
-    - 支持 X.509 / PEM / PKCS7 证书格式解析
-    - 提取证书为 PEM 格式并展示 issuer/subject
+### ✅ 签名提取
 
-- ✅ **组件漏洞提取**
-    - 支持对接 Dependency-Track API
-    - 自动导出组件漏洞为 CSV 文件
+- 支持 PKCS7 / PEM / DER 格式
+- 自动转为可读格式并导出
 
-- ✅ **HEX Dump 文件还原**
-    - 自动提取十六进制字节并重构文本内容
-    - 智能识别是否为 JSON / BIN / TXT
-    - 支持还原为原始文件并保存
+### ✅ SBOM 漏洞提取
 
----
+- 集成 Dependency-Track 接口
+- 支持 UUID 查询并导出漏洞 CSV
 
-## 📦 安装与运行
+### ✅ HEX解析
 
-### 依赖环境
+- 提取 HEX 串并按指定或自动编码解码
+- 支持多种格式输入（.txt / .log / 粘贴）
+- 可读性评分 + 自动排序
 
-- Python 3.6+
-- PyQt5
-- requests
-- 可选模块：apkverify（用于解析APK签名）
+### ✅ DID解析
 
-### 安装依赖
+- 从 JSON 中提取 value_hex 字段
+- 自动识别编码并按可读性评分排序输出
+- 支持结果导出 TXT / CSV
+
+## 安装依赖
 
 ```bash
-pip install -r requirements.txt
+pip install PyQt5 requests
+```
+
+## 打包方式
+
+```
+pyinstaller -F -w -i tamper.ico main.py
+```
+
+## ✅ 使用建议
+
+- 建议使用 UTF-8 编码的 JSON 文件输入
+- 避免对真实生产固件执行篡改操作
+- 所有操作日志均可导出或复制
