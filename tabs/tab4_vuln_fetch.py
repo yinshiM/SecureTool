@@ -1,22 +1,26 @@
-import os, datetime, csv, requests
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTextEdit, QFileDialog
+import os, csv, datetime, requests
+from PyQt5.QtWidgets import QFileDialog, QHBoxLayout, QVBoxLayout
+from qfluentwidgets import (
+    LineEdit, PushButton, TextEdit, BodyLabel, SimpleCardWidget, TitleLabel
 )
 
 latest_findings = []
 
 
 def create_vuln_tab():
-    tab = QWidget()
-    layout = QVBoxLayout(tab)
-    log_output = QTextEdit()
-    log_output.setReadOnly(True)
+    card = SimpleCardWidget()
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(15)
 
-    url_input = QLineEdit("http://127.0.0.1:8080")
-    api_key_input = QLineEdit()
-    api_key_input.setEchoMode(QLineEdit.Password)
-    uuid_input = QLineEdit()
+    layout.addWidget(TitleLabel("组件漏洞提取"))
+
+    url_input = LineEdit()
+    api_key_input = LineEdit()
+    uuid_input = LineEdit()
+
+    log_output = TextEdit()
+    log_output.setReadOnly(True)
 
     def log(msg):
         log_output.append(msg)
@@ -54,7 +58,7 @@ def create_vuln_tab():
         if not latest_findings:
             log("[!] 暂无漏洞信息可导出")
             return
-        folder = QFileDialog.getExistingDirectory(tab, "选择导出目录")
+        folder = QFileDialog.getExistingDirectory(card, "选择导出目录")
         if not folder:
             log("[!] 已取消导出")
             return
@@ -76,35 +80,35 @@ def create_vuln_tab():
         except Exception as e:
             log(f"[!] 导出失败: {e}")
 
-    # 布局区域
-    url_row = QHBoxLayout()
-    url_row.addWidget(QLabel("🎯 DT-Api:"))
-    url_row.addWidget(url_input)
+    # UI布局
+    row1 = QHBoxLayout()
+    row1.addWidget(BodyLabel("🎯 DT-Api:"))
+    row1.addWidget(url_input)
 
-    key_row = QHBoxLayout()
-    key_row.addWidget(QLabel("🔑 API-Key:"))
-    key_row.addWidget(api_key_input)
+    row2 = QHBoxLayout()
+    row2.addWidget(BodyLabel("🔑 API-Key:"))
+    row2.addWidget(api_key_input)
 
-    uuid_row = QHBoxLayout()
-    uuid_row.addWidget(QLabel("🆔 UUID:"))
-    uuid_row.addWidget(uuid_input)
+    row3 = QHBoxLayout()
+    row3.addWidget(BodyLabel("🆔 UUID:"))
+    row3.addWidget(uuid_input)
 
-    btn_row = QHBoxLayout()
-    fetch_btn = QPushButton("拉取漏洞信息")
-    export_btn = QPushButton("导出为 Excel")
-    clear_btn = QPushButton("清除日志")
+    row4 = QHBoxLayout()
+    fetch_btn = PushButton("📥 拉取漏洞信息")
+    export_btn = PushButton("💾 导出为 Excel")
+    clear_btn = PushButton("🧹 清除日志")
     fetch_btn.clicked.connect(fetch_vulns)
     export_btn.clicked.connect(export_to_csv)
     clear_btn.clicked.connect(log_output.clear)
-    btn_row.addWidget(fetch_btn)
-    btn_row.addWidget(export_btn)
-    btn_row.addWidget(clear_btn)
+    row4.addWidget(fetch_btn)
+    row4.addWidget(export_btn)
+    row4.addWidget(clear_btn)
 
-    layout.addLayout(url_row)
-    layout.addLayout(key_row)
-    layout.addLayout(uuid_row)
-    layout.addLayout(btn_row)
-    layout.addWidget(QLabel("📋 漏洞日志输出:"))
+    layout.addLayout(row1)
+    layout.addLayout(row2)
+    layout.addLayout(row3)
+    layout.addLayout(row4)
+    layout.addWidget(TitleLabel("📋 漏洞日志输出"))
     layout.addWidget(log_output)
 
-    return tab
+    return card

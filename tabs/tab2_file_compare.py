@@ -1,7 +1,8 @@
 import os
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QHBoxLayout, QVBoxLayout
+from qfluentwidgets import (
+    SimpleCardWidget, PushButton, TextEdit,
+    TitleLabel, BodyLabel
 )
 
 compare_file1 = None
@@ -9,9 +10,14 @@ compare_file2 = None
 
 
 def create_compare_tab():
-    tab = QWidget()
-    layout = QVBoxLayout(tab)
-    log_output = QTextEdit()
+    card = SimpleCardWidget()
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(15)
+
+    layout.addWidget(TitleLabel("文件对比功能"))
+
+    log_output = TextEdit()
     log_output.setReadOnly(True)
 
     def log(msg):
@@ -19,13 +25,13 @@ def create_compare_tab():
 
     def select_original_file():
         global compare_file1
-        compare_file1, _ = QFileDialog.getOpenFileName(tab, '选择原始文件')
+        compare_file1, _ = QFileDialog.getOpenFileName(card, '选择原始文件')
         if compare_file1:
             log(f"[*] 原始文件: {compare_file1}")
 
     def select_tampered_file():
         global compare_file2
-        compare_file2, _ = QFileDialog.getOpenFileName(tab, '选择篡改文件')
+        compare_file2, _ = QFileDialog.getOpenFileName(card, '选择篡改文件')
         if compare_file2:
             log(f"[*] 篡改文件: {compare_file2}")
 
@@ -44,26 +50,18 @@ def create_compare_tab():
         except Exception as e:
             log(f"[!] 对比失败: {e}")
 
-    btn_orig = QPushButton("选择原始文件")
-    btn_orig.clicked.connect(select_original_file)
+    row = QHBoxLayout()
+    row.addWidget(PushButton("📂 原始文件", card))
+    row.itemAt(0).widget().clicked.connect(select_original_file)
+    row.addWidget(PushButton("📝 篡改文件", card))
+    row.itemAt(1).widget().clicked.connect(select_tampered_file)
+    row.addWidget(PushButton("🔍 对比差异", card))
+    row.itemAt(2).widget().clicked.connect(compare_files)
+    row.addWidget(PushButton("🧹 清除日志", card))
+    row.itemAt(3).widget().clicked.connect(log_output.clear)
 
-    btn_tamp = QPushButton("选择篡改文件")
-    btn_tamp.clicked.connect(select_tampered_file)
-
-    btn_cmp = QPushButton("对比文件差异")
-    btn_cmp.clicked.connect(compare_files)
-
-    btn_clr = QPushButton("清除日志")
-    btn_clr.clicked.connect(log_output.clear)
-
-    hbox = QHBoxLayout()
-    hbox.addWidget(btn_orig)
-    hbox.addWidget(btn_tamp)
-    hbox.addWidget(btn_cmp)
-    hbox.addWidget(btn_clr)
-
-    layout.addLayout(hbox)
-    layout.addWidget(QLabel("日志输出:"))
+    layout.addLayout(row)
+    layout.addWidget(TitleLabel("日志输出"))
     layout.addWidget(log_output)
 
-    return tab
+    return card

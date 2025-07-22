@@ -1,96 +1,51 @@
 import base64
 import urllib.parse
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit,
-    QPushButton, QLineEdit, QMessageBox
+from qfluentwidgets import (
+    LineEdit, PushButton, TextEdit, SimpleCardWidget,
+    TitleLabel, BodyLabel
 )
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout
 
 
 def create_codec_tab():
-    tab = QWidget()
-    layout = QVBoxLayout(tab)
+    card = SimpleCardWidget()
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(12)
 
-    input_text = QTextEdit()
-    input_text.setPlaceholderText("输入待编解码的文本")
-    output_text = QTextEdit()
-    output_text.setPlaceholderText("输出结果")
-    output_text.setReadOnly(True)
+    layout.addWidget(TitleLabel("常用编解码工具"))
 
-    def show_result(result):
-        output_text.setPlainText(result)
+    input_box = LineEdit()
+    input_box.setPlaceholderText("输入需要处理的字符串")
+    output_box = TextEdit()
+    output_box.setReadOnly(True)
 
-    def encode_base64():
-        try:
-            text = input_text.toPlainText().encode('utf-8')
-            result = base64.b64encode(text).decode()
-            show_result(result)
-        except Exception as e:
-            show_result(f"[Base64 编码错误] {e}")
+    row = QHBoxLayout()
+    btn_b64_enc = PushButton("Base64编码")
+    btn_b64_dec = PushButton("Base64解码")
+    btn_url_enc = PushButton("URL编码")
+    btn_url_dec = PushButton("URL解码")
+    btn_clear = PushButton("清空")
 
-    def decode_base64():
-        try:
-            text = input_text.toPlainText().strip()
-            result = base64.b64decode(text).decode('utf-8', errors='replace')
-            show_result(result)
-        except Exception as e:
-            show_result(f"[Base64 解码错误] {e}")
+    row.addWidget(btn_b64_enc)
+    row.addWidget(btn_b64_dec)
+    row.addWidget(btn_url_enc)
+    row.addWidget(btn_url_dec)
+    row.addWidget(btn_clear)
 
-    def encode_url():
-        try:
-            result = urllib.parse.quote(input_text.toPlainText())
-            show_result(result)
-        except Exception as e:
-            show_result(f"[URL 编码错误] {e}")
+    layout.addWidget(BodyLabel("输入文本:"))
+    layout.addWidget(input_box)
+    layout.addLayout(row)
+    layout.addWidget(BodyLabel("结果输出:"))
+    layout.addWidget(output_box)
 
-    def decode_url():
-        try:
-            result = urllib.parse.unquote(input_text.toPlainText())
-            show_result(result)
-        except Exception as e:
-            show_result(f"[URL 解码错误] {e}")
+    def set_output(text):
+        output_box.setPlainText(text)
 
-    def encode_ascii():
-        try:
-            result = ' '.join(f'{ord(c):02x}' for c in input_text.toPlainText())
-            show_result(result)
-        except Exception as e:
-            show_result(f"[ASCII 编码错误] {e}")
+    btn_b64_enc.clicked.connect(lambda: set_output(base64.b64encode(input_box.text().encode()).decode()))
+    btn_b64_dec.clicked.connect(lambda: set_output(base64.b64decode(input_box.text().encode()).decode(errors="ignore")))
+    btn_url_enc.clicked.connect(lambda: set_output(urllib.parse.quote(input_box.text())))
+    btn_url_dec.clicked.connect(lambda: set_output(urllib.parse.unquote(input_box.text())))
+    btn_clear.clicked.connect(lambda: (input_box.clear(), output_box.clear()))
 
-    def decode_ascii():
-        try:
-            hex_str = input_text.toPlainText().replace(" ", "")
-            bytes_data = bytes.fromhex(hex_str)
-            result = bytes_data.decode('utf-8', errors='replace')
-            show_result(result)
-        except Exception as e:
-            show_result(f"[ASCII 解码错误] {e}")
-
-    def clear_all():
-        input_text.clear()
-        output_text.clear()
-
-    # 布局
-    btn_row1 = QHBoxLayout()
-    btn_row1.addWidget(QPushButton("Base64 编码", clicked=encode_base64))
-    btn_row1.addWidget(QPushButton("Base64 解码", clicked=decode_base64))
-
-    btn_row2 = QHBoxLayout()
-    btn_row2.addWidget(QPushButton("URL 编码", clicked=encode_url))
-    btn_row2.addWidget(QPushButton("URL 解码", clicked=decode_url))
-
-    btn_row3 = QHBoxLayout()
-    btn_row3.addWidget(QPushButton("ASCII 编码", clicked=encode_ascii))
-    btn_row3.addWidget(QPushButton("ASCII 解码", clicked=decode_ascii))
-
-    btn_clear = QPushButton("清除全部", clicked=clear_all)
-
-    layout.addWidget(QLabel("输入区域:"))
-    layout.addWidget(input_text)
-    layout.addLayout(btn_row1)
-    layout.addLayout(btn_row2)
-    layout.addLayout(btn_row3)
-    layout.addWidget(QLabel("输出区域:"))
-    layout.addWidget(output_text)
-    layout.addWidget(btn_clear)
-
-    return tab
+    return card

@@ -1,10 +1,8 @@
-import json
-import os
-import re
-import csv
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QFileDialog, QComboBox
+import os, json, csv, re
+from PyQt5.QtWidgets import QFileDialog, QHBoxLayout, QVBoxLayout
+from qfluentwidgets import (
+    LineEdit, PushButton, ComboBox, TextEdit,
+    TitleLabel, BodyLabel, SimpleCardWidget
 )
 
 COMMON_ENCODINGS = [
@@ -33,26 +31,30 @@ def try_best_decode(byte_data):
 
 
 def create_did_parser_tab():
-    tab = QWidget()
-    layout = QVBoxLayout(tab)
+    card = SimpleCardWidget()
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(10)
 
-    input_path = QLineEdit()
+    layout.addWidget(TitleLabel("DID解析工具（支持编码识别和导出）"))
+
+    input_path = LineEdit()
     input_path.setPlaceholderText("选择包含 value_hex 的 JSON 文件")
 
-    output = QTextEdit()
-    output.setReadOnly(True)
+    result_view = TextEdit()
+    result_view.setReadOnly(True)
 
-    log = QTextEdit()
-    log.setReadOnly(True)
+    log_view = TextEdit()
+    log_view.setReadOnly(True)
 
-    enc_cb = QComboBox()
+    enc_cb = ComboBox()
     enc_cb.addItem("自动识别编码")
     enc_cb.addItems(COMMON_ENCODINGS)
 
     parsed_results = []
 
     def browse_file():
-        path, _ = QFileDialog.getOpenFileName(tab, "选择 JSON 文件", "", "JSON files (*.json)")
+        path, _ = QFileDialog.getOpenFileName(card, "选择 JSON 文件", "", "JSON files (*.json)")
         if path:
             input_path.setText(path)
 
@@ -60,9 +62,9 @@ def create_did_parser_tab():
         nonlocal parsed_results
         path = input_path.text().strip()
         if not os.path.isfile(path):
-            log.append("[!] 文件无效")
+            log_view.append("[!] 文件无效")
             return
-        log.append(f"[*] 解析文件: {path}")
+        log_view.append(f"[*] 解析文件: {path}")
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -82,32 +84,31 @@ def create_did_parser_tab():
                     except:
                         text, enc_used, score = '', enc_cb.currentText(), 0
                 results.append((did, text, enc_used, score))
-            # 按照可读性从高到低排序
             parsed_results = sorted(results, key=lambda x: x[3], reverse=True)
-            output.clear()
+            result_view.clear()
             for did, val, enc_used, score in parsed_results:
-                output.append(f"DID: {did} | 编码: {enc_used} | 可读性: {score:.2f}")
-                output.append(f"内容: {val}\n")
-            log.append(f"[+] 共解析 {len(parsed_results)} 条记录")
+                result_view.append(f"DID: {did} | 编码: {enc_used} | 可读性: {score:.2f}")
+                result_view.append(f"内容: {val}\n")
+            log_view.append(f"[+] 共解析 {len(parsed_results)} 条记录")
         except Exception as e:
-            log.append(f"[!] 解析失败: {e}")
+            log_view.append(f"[!] 解析失败: {e}")
 
     def save_results():
-        out_path, _ = QFileDialog.getSaveFileName(tab, "保存结果", "did_results.txt", "Text Files (*.txt)")
+        out_path, _ = QFileDialog.getSaveFileName(card, "保存结果", "did_results.txt", "Text Files (*.txt)")
         if not out_path:
             return
         try:
             with open(out_path, 'w', encoding='utf-8') as f:
-                f.write(output.toPlainText())
-            log.append(f"[+] 结果已保存到: {out_path}")
+                f.write(result_view.toPlainText())
+            log_view.append(f"[+] 结果已保存到: {out_path}")
         except Exception as e:
-            log.append(f"[!] 保存失败: {e}")
+            log_view.append(f"[!] 保存失败: {e}")
 
     def export_csv():
         if not parsed_results:
-            log.append("[!] 没有结果可导出")
+            log_view.append("[!] 没有结果可导出")
             return
-        path, _ = QFileDialog.getSaveFileName(tab, "导出CSV", "did_results.csv", "CSV Files (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(card, "导出CSV", "did_results.csv", "CSV Files (*.csv)")
         if not path:
             return
         try:
@@ -116,24 +117,31 @@ def create_did_parser_tab():
                 writer.writerow(["DID", "内容", "编码", "可读性评分"])
                 for did, val, enc_used, score in parsed_results:
                     writer.writerow([did, val, enc_used, f"{score:.2f}"])
-            log.append(f"[+] 已导出CSV: {path}")
+            log_view.append(f"[+] 已导出CSV: {path}")
         except Exception as e:
-            log.append(f"[!] CSV导出失败: {e}")
+            log_view.append(f"[!] CSV导出失败: {e}")
 
-    top = QHBoxLayout()
-    top.addWidget(QLabel("JSON路径:"))
-    top.addWidget(input_path)
-    top.addWidget(QPushButton("选择", clicked=browse_file))
-    top.addWidget(QLabel("解码方式:"))
-    top.addWidget(enc_cb)
-    top.addWidget(QPushButton("解析", clicked=parse_json))
-    top.addWidget(QPushButton("保存", clicked=save_results))
-    top.addWidget(QPushButton("导出CSV", clicked=export_csv))
+    row1 = QHBoxLayout()
+    row1.addWidget(BodyLabel("JSON路径:"))
+    row1.addWidget(input_path)
+    row1.addWidget(PushButton("选择", parent=card))
+    row1.itemAt(2).widget().clicked.connect(browse_file)
 
-    layout.addLayout(top)
-    layout.addWidget(QLabel("日志输出:"))
-    layout.addWidget(log)
-    layout.addWidget(QLabel("解析结果:"))
-    layout.addWidget(output)
+    row2 = QHBoxLayout()
+    row2.addWidget(BodyLabel("解码方式:"))
+    row2.addWidget(enc_cb)
+    row2.addWidget(PushButton("解析", parent=card))
+    row2.addWidget(PushButton("保存", parent=card))
+    row2.addWidget(PushButton("导出CSV", parent=card))
+    row2.itemAt(2).widget().clicked.connect(parse_json)
+    row2.itemAt(3).widget().clicked.connect(save_results)
+    row2.itemAt(4).widget().clicked.connect(export_csv)
 
-    return tab
+    layout.addLayout(row1)
+    layout.addLayout(row2)
+    layout.addWidget(TitleLabel("日志输出"))
+    layout.addWidget(log_view)
+    layout.addWidget(TitleLabel("解析结果"))
+    layout.addWidget(result_view)
+
+    return card

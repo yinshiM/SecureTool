@@ -1,14 +1,33 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit
+from qfluentwidgets import SimpleCardWidget, TitleLabel
 
 
 def create_usage_tab():
     tab = QWidget()
     layout = QVBoxLayout(tab)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(20)
+
+    layout.addWidget(TitleLabel("使用说明"))
+
+    # 使用卡片组件展示内容
+    usage_card = SimpleCardWidget()
+    usage_layout = QVBoxLayout(usage_card)
+    usage_layout.setContentsMargins(20, 10, 20, 10)
+    usage_layout.setSpacing(10)
+
     usage = QTextEdit()
     usage.setReadOnly(True)
-    usage.setPlainText("""工具使用说明：
-
-✅ 模块 1 - 固件篡改
+    usage.setMinimumHeight(520)
+    usage.setStyleSheet("""
+        QTextEdit {
+            background-color: #1e1e1e;
+            color: #dddddd;
+            border: none;
+            font-size: 15px;
+        }
+    """)
+    usage.setPlainText("""✅ 模块 1 - 固件篡改
 - 支持 flip（取反）、zero（清零）、random（随机）三种篡改方式
 - 可选择签名区域、非签名区域或全范围进行修改
 - 自动识别签名区域（若无法识别默认使用末尾512字节）
@@ -45,5 +64,8 @@ def create_usage_tab():
 - 推荐使用自动编码识别结合手动切换以提升解码准确率
 - 所有导出功能支持 UTF-8 编码
 """)
-    layout.addWidget(usage)
+
+    usage_layout.addWidget(usage)
+    layout.addWidget(usage_card)
+
     return tab

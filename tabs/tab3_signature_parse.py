@@ -1,20 +1,29 @@
 import os, subprocess, re, zipfile
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QLineEdit, QFileDialog
+from PyQt5.QtWidgets import QFileDialog
+from qfluentwidgets import (
+    PushButton, LineEdit, TextEdit, TitleLabel,
+    BodyLabel, SimpleCardWidget
 )
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout
 
 
 def create_signature_tab():
-    tab = QWidget()
-    layout = QVBoxLayout(tab)
-    log_output = QTextEdit()
+    card = SimpleCardWidget()
+    card.setObjectName("signature")  # 注册 routeKey
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(15)
+
+    layout.addWidget(TitleLabel("签名解析与证书提取"))
+
+    log_output = TextEdit()
     log_output.setReadOnly(True)
-    input_path = QLineEdit()
-    input_path.setPlaceholderText("拖入或选择要解析的文件路径")
 
     def log(msg):
         log_output.append(msg)
+
+    input_path = LineEdit()
+    input_path.setPlaceholderText("拖入或选择要解析的文件路径")
 
     def handle_parse_file(path):
         if not os.path.isfile(path):
@@ -22,6 +31,7 @@ def create_signature_tab():
             return
         log("[*] 使用 openssl 检查签名/证书信息...")
         log("=" * 50)
+
         try:
             for cmd, label in [
                 (f"openssl pkcs7 -inform DER -in \"{path}\" -print_certs", "PKCS7"),
@@ -41,8 +51,10 @@ def create_signature_tab():
                     log(f"[-] 未检测到 {label} 格式证书")
         except Exception as e:
             log(f"[!] openssl 执行失败: {e}")
+
         log("=" * 50)
 
+        # 额外提取证书
         certs = []
         try:
             from apkverify import ApkSignature
@@ -82,28 +94,28 @@ def create_signature_tab():
                     log("        " + line)
             except Exception as e:
                 log(f"    [-] openssl 分析失败: {e}")
+
         log(f"[*] 共提取 {len(certs)} 个证书")
 
-    btn_browse = QPushButton("选择文件")
-    btn_browse.clicked.connect(lambda: input_path.setText(QFileDialog.getOpenFileName(tab, '选择固件文件')[0]))
+    # 按钮和输入行
+    row = QHBoxLayout()
+    row.addWidget(BodyLabel("路径:"))
+    row.addWidget(input_path)
 
-    btn_parse = QPushButton("解析+提取证书")
-    btn_parse.clicked.connect(
-        lambda: handle_parse_file(input_path.text().strip()) if input_path.text().strip() else log(
-            "[!] 请输入文件路径"))
+    btn_select = PushButton("📂 选择文件")
+    btn_select.clicked.connect(lambda: input_path.setText(QFileDialog.getOpenFileName(card, '选择文件')[0]))
+    row.addWidget(btn_select)
 
-    btn_clear = QPushButton("清除日志")
+    btn_parse = PushButton("🔍 解析+提取")
+    btn_parse.clicked.connect(lambda: handle_parse_file(input_path.text().strip()))
+    row.addWidget(btn_parse)
+
+    btn_clear = PushButton("🧹 清除日志")
     btn_clear.clicked.connect(log_output.clear)
+    row.addWidget(btn_clear)
 
-    top_row = QHBoxLayout()
-    top_row.addWidget(QLabel("文件路径:"))
-    top_row.addWidget(input_path)
-    top_row.addWidget(btn_browse)
-    top_row.addWidget(btn_parse)
-    top_row.addWidget(btn_clear)
-
-    layout.addLayout(top_row)
-    layout.addWidget(QLabel("解析结果:"))
+    layout.addLayout(row)
+    layout.addWidget(TitleLabel("解析输出"))
     layout.addWidget(log_output)
 
-    return tab
+    return card
