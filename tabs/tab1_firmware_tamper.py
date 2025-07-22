@@ -1,7 +1,8 @@
 import os, random, datetime, re
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QTextEdit, QComboBox, QFileDialog
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QFileDialog
+from qfluentwidgets import (
+    LineEdit, ComboBox, PushButton, TextEdit,
+    SimpleCardWidget, BodyLabel, TitleLabel
 )
 
 SIGNATURE_PATTERNS = [
@@ -19,9 +20,14 @@ SIGNATURE_PATTERNS = [
 
 
 def create_firmware_tab():
-    tab = QWidget()
-    layout = QVBoxLayout(tab)
-    log_output = QTextEdit()
+    card = SimpleCardWidget()
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(30, 20, 30, 20)
+    layout.setSpacing(15)
+
+    layout.addWidget(TitleLabel("固件篡改功能"))
+
+    log_output = TextEdit()
     log_output.setReadOnly(True)
 
     def log(msg):
@@ -87,45 +93,47 @@ def create_firmware_tab():
             f.write(data)
         log(f"[+] 已保存: {out_path}")
 
-    file_input = QLineEdit()
-    btn_browse = QPushButton("📂 选择文件")
-    btn_browse.clicked.connect(lambda: file_input.setText(
-        QFileDialog.getOpenFileName(tab, '选择固件', '', '固件 (*.bin *.zip *.dtb *.imx)')[0]))
+    file_input = LineEdit()
+    file_input.setPlaceholderText("固件文件路径")
 
-    mode_cb = QComboBox()
+    btn_browse = PushButton("📂 选择文件")
+    btn_browse.clicked.connect(lambda: file_input.setText(
+        QFileDialog.getOpenFileName(card, '选择固件', '', '固件 (*.bin *.zip *.dtb *.imx)')[0]))
+
+    mode_cb = ComboBox()
     mode_cb.addItems(['flip', 'zero', 'random'])
 
-    area_cb = QComboBox()
+    area_cb = ComboBox()
     area_cb.addItems(['签名区域', '非签名区域', '两者都篡改'])
 
-    times_input = QLineEdit('1')
+    times_input = LineEdit()
+    times_input.setText("1")
 
-    btn_start = QPushButton("🚀 开始篡改")
-    btn_start.clicked.connect(
-        lambda: tamper_firmware(file_input.text(), mode_cb.currentText(), int(times_input.text()),
-                                area_cb.currentText()))
+    btn_start = PushButton("🚀 开始篡改")
+    btn_start.clicked.connect(lambda: tamper_firmware(
+        file_input.text(), mode_cb.currentText(), int(times_input.text()), area_cb.currentText()))
 
-    btn_clear = QPushButton("清除日志")
+    btn_clear = PushButton("🧹 清除日志")
     btn_clear.clicked.connect(log_output.clear)
 
-    hbox1 = QHBoxLayout()
-    hbox1.addWidget(QLabel("文件路径:"))
-    hbox1.addWidget(file_input)
-    hbox1.addWidget(btn_browse)
+    row1 = QHBoxLayout()
+    row1.addWidget(BodyLabel("路径:"))
+    row1.addWidget(file_input)
+    row1.addWidget(btn_browse)
 
-    hbox2 = QHBoxLayout()
-    hbox2.addWidget(QLabel("篡改模式:"))
-    hbox2.addWidget(mode_cb)
-    hbox2.addWidget(QLabel("篡改区域:"))
-    hbox2.addWidget(area_cb)
-    hbox2.addWidget(QLabel("次数:"))
-    hbox2.addWidget(times_input)
-    hbox2.addWidget(btn_start)
-    hbox2.addWidget(btn_clear)
+    row2 = QHBoxLayout()
+    row2.addWidget(BodyLabel("模式:"))
+    row2.addWidget(mode_cb)
+    row2.addWidget(BodyLabel("区域:"))
+    row2.addWidget(area_cb)
+    row2.addWidget(BodyLabel("次数:"))
+    row2.addWidget(times_input)
+    row2.addWidget(btn_start)
+    row2.addWidget(btn_clear)
 
-    layout.addLayout(hbox1)
-    layout.addLayout(hbox2)
-    layout.addWidget(QLabel("日志输出:"))
+    layout.addLayout(row1)
+    layout.addLayout(row2)
+    layout.addWidget(TitleLabel("日志输出"))
     layout.addWidget(log_output)
 
-    return tab
+    return card
