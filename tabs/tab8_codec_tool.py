@@ -42,8 +42,19 @@ def create_codec_tab():
     def set_output(text):
         output_box.setPlainText(text)
 
+    def safe_base64_decode():
+        text = input_box.text().strip()
+        if not text:
+            set_output("[!] 输入为空")
+            return
+        try:
+            decoded = base64.b64decode(text.encode())
+            set_output(decoded.decode(errors="ignore"))
+        except Exception as e:
+            set_output(f"[!] 解码失败: {str(e)}")
+
     btn_b64_enc.clicked.connect(lambda: set_output(base64.b64encode(input_box.text().encode()).decode()))
-    btn_b64_dec.clicked.connect(lambda: set_output(base64.b64decode(input_box.text().encode()).decode(errors="ignore")))
+    btn_b64_dec.clicked.connect(safe_base64_decode)
     btn_url_enc.clicked.connect(lambda: set_output(urllib.parse.quote(input_box.text())))
     btn_url_dec.clicked.connect(lambda: set_output(urllib.parse.unquote(input_box.text())))
     btn_clear.clicked.connect(lambda: (input_box.clear(), output_box.clear()))
