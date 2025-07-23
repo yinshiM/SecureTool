@@ -1,15 +1,10 @@
-import os
-import hashlib
-import csv
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
+from qfluentwidgets import (
+    TitleLabel, BodyLabel, LineEdit, PushButton, FluentIcon, TextEdit
+)
+import os, hashlib, csv
 from zlib import crc32
 from binascii import crc_hqx
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, QFileDialog
-)
-from qfluentwidgets import (
-    TitleLabel, BodyLabel, LineEdit, PushButton, FluentIcon, InfoBarIcon,
-    setFont, FluentIconBase
-)
 
 
 def create_hash_tab():
@@ -18,10 +13,8 @@ def create_hash_tab():
     layout.setContentsMargins(30, 20, 30, 20)
     layout.setSpacing(12)
 
-    # === 标题 ===
     layout.addWidget(TitleLabel("哈希工具"))
 
-    # === 输入区（标签 + 输入框）===
     input_row = QHBoxLayout()
     input_label = BodyLabel("输入内容:")
     input_label.setFixedWidth(60)
@@ -30,12 +23,17 @@ def create_hash_tab():
     input_box.setPlaceholderText("输入字符串或选择文件")
     input_row.addWidget(input_label)
     input_row.addWidget(input_box)
-
     layout.addLayout(input_row)
 
-    # === 功能按钮行 ===
     btn_row = QHBoxLayout()
     btn_row.setSpacing(10)
+
+    folder_data = []
+
+    # ✅ 使用 TextEdit 而非 QTextEdit，支持自动主题切换
+    output = TextEdit()
+    output.setReadOnly(True)
+    output.setMinimumHeight(240)
 
     def append_result(text):
         output.append(text + "\n")
@@ -76,8 +74,6 @@ def create_hash_tab():
             append_result(f"  CRC16: {format(crc_hqx(data, 0), '04x')}")
         except Exception as e:
             append_result(f"[!] 文件处理失败: {e}")
-
-    folder_data = []
 
     def folder_hash():
         nonlocal folder_data
@@ -126,38 +122,28 @@ def create_hash_tab():
         except Exception as e:
             append_result(f"[!] 导出失败: {e}")
 
-    btn_row.addWidget(PushButton("字符串哈希", icon=FluentIcon.CODE))
-    btn_row.itemAt(btn_row.count() - 1).widget().clicked.connect(string_hash)
+    btn_str = PushButton("字符串哈希", icon=FluentIcon.CODE)
+    btn_str.clicked.connect(string_hash)
+    btn_row.addWidget(btn_str)
 
-    btn_row.addWidget(PushButton("文件哈希", icon=FluentIcon.DOCUMENT))
-    btn_row.itemAt(btn_row.count() - 1).widget().clicked.connect(file_hash)
+    btn_file = PushButton("文件哈希", icon=FluentIcon.DOCUMENT)
+    btn_file.clicked.connect(file_hash)
+    btn_row.addWidget(btn_file)
 
-    btn_row.addWidget(PushButton("批量文件夹", icon=FluentIcon.FOLDER))
-    btn_row.itemAt(btn_row.count() - 1).widget().clicked.connect(folder_hash)
+    btn_folder = PushButton("批量文件夹", icon=FluentIcon.FOLDER)
+    btn_folder.clicked.connect(folder_hash)
+    btn_row.addWidget(btn_folder)
 
-    btn_row.addWidget(PushButton("导出为 CSV", icon=FluentIcon.SAVE))
-    btn_row.itemAt(btn_row.count() - 1).widget().clicked.connect(export_csv)
+    btn_csv = PushButton("导出为 CSV", icon=FluentIcon.SAVE)
+    btn_csv.clicked.connect(export_csv)
+    btn_row.addWidget(btn_csv)
 
-    btn_row.addWidget(PushButton("清空结果", icon=FluentIcon.BROOM))
-    btn_row.itemAt(btn_row.count() - 1).widget().clicked.connect(clear_output)
+    btn_clear = PushButton("清空结果", icon=FluentIcon.BROOM)
+    btn_clear.clicked.connect(clear_output)
+    btn_row.addWidget(btn_clear)
 
     layout.addLayout(btn_row)
-
-    # === 输出区 ===
     layout.addWidget(BodyLabel("输出结果:"))
-
-    global output
-    output = QTextEdit()
-    output.setReadOnly(True)
-    output.setMinimumHeight(240)
-    output.setStyleSheet("""
-        QTextEdit {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            border: 1px solid #444;
-            font-family: Consolas, monospace;
-        }
-    """)
     layout.addWidget(output)
 
     return tab

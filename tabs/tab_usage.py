@@ -1,32 +1,32 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from qfluentwidgets import SimpleCardWidget, TitleLabel
+from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from qfluentwidgets import (
+    SimpleCardWidget, TitleLabel, BodyLabel, TextEdit
+)
 
 
 def create_usage_tab():
     tab = QWidget()
     layout = QVBoxLayout(tab)
     layout.setContentsMargins(30, 20, 30, 20)
-    layout.setSpacing(20)
+    layout.setSpacing(12)
 
     layout.addWidget(TitleLabel("使用说明"))
 
-    # 使用卡片组件展示内容
+    desc = BodyLabel(
+        "本工具集成多个安全分析模块，支持固件篡改、文件对比、签名提取、组件漏洞查询、十六进制解析、DID 解码与哈希计算等功能，适用于嵌入式安全与工业协议分析场景。")
+
+    layout.addWidget(desc)
+
     usage_card = SimpleCardWidget()
     usage_layout = QVBoxLayout(usage_card)
     usage_layout.setContentsMargins(20, 10, 20, 10)
     usage_layout.setSpacing(10)
 
-    usage = QTextEdit()
+    usage = TextEdit()
     usage.setReadOnly(True)
     usage.setMinimumHeight(520)
-    usage.setStyleSheet("""
-        QTextEdit {
-            background-color: #1e1e1e;
-            color: #dddddd;
-            border: none;
-            font-size: 15px;
-        }
-    """)
+    usage.setPlaceholderText("模块说明...")  # 可选
+
     usage.setPlainText("""✅ 模块 1 - 固件篡改
 - 支持 flip（取反）、zero（清零）、random（随机）三种篡改方式
 - 可选择签名区域、非签名区域或全范围进行修改
