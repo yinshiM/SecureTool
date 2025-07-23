@@ -9,7 +9,6 @@ from qfluentwidgets import (
 
 from tabs.tab1_firmware_tamper import create_firmware_tab
 from tabs.tab2_file_compare import create_compare_tab
-from tabs.tab3_signature_parse import create_signature_tab
 from tabs.tab4_vuln_fetch import create_vuln_tab
 from tabs.tab5_hex_convert import create_hex_tab
 from tabs.tab6_did_parser import create_did_parser_tab
@@ -30,7 +29,6 @@ class MyApp(FluentWindow):
         pages = [
             ("固件篡改", FluentIcon.EDIT, create_firmware_tab()),
             ("文件对比", FluentIcon.SYNC, create_compare_tab()),
-            ("签名解析", FluentIcon.LEAF, create_signature_tab()),
             ("组件漏洞提取", FluentIcon.SEARCH, create_vuln_tab()),
             ("HEX解析", FluentIcon.IOT, create_hex_tab()),
             ("DID解析", FluentIcon.DEVELOPER_TOOLS, create_did_parser_tab()),
